@@ -23,7 +23,7 @@ class LoginPageState extends State<LoginPage> {
     if (mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => HomePage()),
+        MaterialPageRoute(builder: (context) => HomePage()), // Inondation
       );
     }
   } catch (e) {

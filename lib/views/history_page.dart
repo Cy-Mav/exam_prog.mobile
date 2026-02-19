@@ -1,64 +1,93 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
 class HistoryPage extends StatelessWidget {
-  final String userEmail; // on utilise l'email de l'étudiant
+  const HistoryPage({super.key});
 
-  const HistoryPage({super.key, required this.userEmail}); // HistoryPage({required this.userEmail});
+  bool _belongsToUser(Map<String, dynamic> data, User user) {
+    final dynamic userId = data['userId'];
+    final dynamic legacyEmail = data['ID_utilisateur'];
+
+    if (userId is String && userId == user.uid) {
+      return true;
+    }
+
+    if (legacyEmail is String && user.email != null && legacyEmail == user.email) {
+      return true;
+    }
+
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Historique des emprunts")),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('reservations')
-            .where('ID_utilisateur', isEqualTo: userEmail)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+      appBar: AppBar(title: const Text('Historique des emprunts')),
+      body: user == null
+          ? const Center(child: Text('Aucun utilisateur connecte.'))
+          : StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('reservations').snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-          final reservations = snapshot.data!.docs;
+                final reservations = snapshot.data!.docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  return _belongsToUser(data, user);
+                }).toList();
 
-          if (reservations.isEmpty) {
-            return const Center(child: Text("Aucun emprunt pour l'instant."));
-          }
+                if (reservations.isEmpty) {
+                  return const Center(child: Text("Aucun emprunt pour l'instant."));
+                }
 
-          return ListView.builder(
-            itemCount: reservations.length,
-            itemBuilder: (context, index) {
-              var res = reservations[index];
-              String bookId = res['Nom_livre'];
-              String date = res['Date'];
+                return ListView.builder(
+                  itemCount: reservations.length,
+                  itemBuilder: (context, index) {
+                    final res = reservations[index].data() as Map<String, dynamic>;
+                    final String bookId = (res['Nom_livre'] ?? '').toString();
+                    final String date = (res['Date'] ?? '').toString();
 
-              // On fait une requête pour récupérer le titre du livre
-              return FutureBuilder<DocumentSnapshot>(
-                future: FirebaseFirestore.instance.collection('books').doc(bookId).get(),
-                builder: (context, bookSnapshot) {
-                  if (!bookSnapshot.hasData) {
-                    return const ListTile(
-                      title: Text("Chargement du livre..."),
+                    return FutureBuilder<DocumentSnapshot>(
+                      future: FirebaseFirestore.instance.collection('books').doc(bookId).get(),
+                      builder: (context, bookSnapshot) {
+                        if (!bookSnapshot.hasData) {
+                          return const ListTile(title: Text('Chargement du livre...'));
+                        }
+
+                        final bookDoc = bookSnapshot.data!;
+                        if (!bookDoc.exists) {
+                          return Card(
+                            margin: const EdgeInsets.all(8),
+                            child: ListTile(
+                              leading: const Icon(Icons.history, color: Colors.orange),
+                              title: const Text('Livre introuvable'),
+                              subtitle: Text('Date: $date'),
+                            ),
+                          );
+                        }
+
+                        final bookData = bookDoc.data() as Map<String, dynamic>;
+                        final String title = (bookData['Titre'] ?? 'Sans titre').toString();
+                        final String author = (bookData['Auteur'] ?? 'Auteur inconnu').toString();
+
+                        return Card(
+                          margin: const EdgeInsets.all(8),
+                          child: ListTile(
+                            leading: const Icon(Icons.history, color: Colors.orange),
+                            title: Text(title),
+                            subtitle: Text('Auteur: $author\nDate: $date'),
+                          ),
+                        );
+                      },
                     );
-                  }
-
-                  var bookData = bookSnapshot.data!;
-                  String title = bookData['Titre'];
-                  String author = bookData['Auteur'];
-
-                  return Card(
-                    margin: const EdgeInsets.all(8),
-                    child: ListTile(
-                      leading: const Icon(Icons.history, color: Colors.orange),
-                      title: Text(title),
-                      subtitle: Text("Auteur: $author\nDate: $date"),
-                    ),
-                  );
-                },
-              );
-            },
-          );
-        },
-      ),
+                  },
+                );
+              },
+            ),
     );
   }
 }

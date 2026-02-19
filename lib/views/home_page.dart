@@ -1,5 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../controllers/library_controller.dart';
 import '../models/book.dart';
 import 'history_page.dart';
@@ -15,18 +17,14 @@ class HomePage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Ma Bibliothèque U 🏪"),
+        title: const Text('Ma Bibliotheque U'),
         actions: [
-          // Bouton Historique
           IconButton(
             icon: const Icon(Icons.history),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      HistoryPage(userEmail: "papanaexauce@gmail.com"), // à remplacer par l'email connecté
-                ),
+                MaterialPageRoute(builder: (context) => const HistoryPage()),
               );
             },
           ),
@@ -34,25 +32,21 @@ class HomePage extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // Barre de recherche
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                labelText: "Chercher un livre...",
+                labelText: 'Chercher un livre...',
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.search),
                   onPressed: () {
-                    // Recherche dans Firestore
                     libraryProvider.fetchBooks(_searchController.text);
                   },
                 ),
               ),
             ),
           ),
-
-          // Liste des livres
           Expanded(
             child: libraryProvider.isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -68,15 +62,26 @@ class HomePage extends StatelessWidget {
                           subtitle: Text(book.author),
                           trailing: book.isAvailable
                               ? ElevatedButton(
-                                  onPressed: () {
-                                    // Réserver le livre avec l'email
-                                    libraryProvider.reserveBook(
-                                        "papanaexauce@gmail.com", book);
+                                  onPressed: () async {
+                                    final user = FirebaseAuth.instance.currentUser;
+                                    if (user == null) {
+                                      if (!context.mounted) {
+                                        return;
+                                      }
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Connecte-toi avant de reserver.'),
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    await libraryProvider.reserveBook(book);
                                   },
-                                  child: const Text("Réserver"),
+                                  child: const Text('Reserver'),
                                 )
                               : const Text(
-                                  "Réservé",
+                                  'Reserve',
                                   style: TextStyle(color: Color.fromARGB(255, 244, 54, 225)),
                                 ),
                         ),
