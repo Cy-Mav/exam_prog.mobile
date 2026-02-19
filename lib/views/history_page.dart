@@ -17,7 +17,7 @@ class HistoryPage extends StatelessWidget {
       return true;
     }
 
-    return false;
+    return false; // scalopandre
   }
 
   @override
